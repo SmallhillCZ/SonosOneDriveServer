@@ -4,6 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 import { GraphAuth } from '../models/graph-auth.model';
 import { Item, FileType } from '../models/item.model';
 import { Constants } from '../config/constants';
+import { hashCode } from '../utils/string.utils';
 
 @Injectable()
 export class OneDriveService {
@@ -44,7 +45,7 @@ export class OneDriveService {
         }
       );
 
-      this.logger.log(`${householdId.hashCode()}: Got verification uri`);
+      this.logger.log(`${hashCode(householdId)}: Got verification uri`);
 
       return {
         linkCode: response.data.user_code,
@@ -83,7 +84,7 @@ export class OneDriveService {
         accessToken = this.compressToken(accessToken);
       }
 
-      this.logger.log(`${householdId.hashCode()}: Got token`);
+      this.logger.log(`${hashCode(householdId)}: Got token`);
 
       return {
         authToken: accessToken,
@@ -93,7 +94,7 @@ export class OneDriveService {
       if (error.response?.status === 400) {
         const errorData = error.response.data;
         if (errorData.error === 'authorization_pending') {
-          this.logger.log(`${householdId.hashCode()}: Not linked retry`);
+          this.logger.log(`${hashCode(householdId)}: Not linked retry`);
           throw new Error(Constants.NOT_LINKED_RETRY);
         }
       }
@@ -136,7 +137,7 @@ export class OneDriveService {
       newAuth.deviceCode = accessToken;
       newAuth.refreshToken = refreshToken;
 
-      this.logger.log(`${auth.householdId.hashCode()}: Got refreshed token`);
+      this.logger.log(`${hashCode(auth.householdId)}: Got refreshed token`);
 
       return newAuth;
     } catch (error) {
@@ -369,20 +370,3 @@ export class OneDriveService {
     return compressedToken;
   }
 }
-
-// Add hashCode method to String prototype
-declare global {
-  interface String {
-    hashCode(): number;
-  }
-}
-
-String.prototype.hashCode = function(): number {
-  let hash = 0;
-  for (let i = 0; i < this.length; i++) {
-    const char = this.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash;
-};

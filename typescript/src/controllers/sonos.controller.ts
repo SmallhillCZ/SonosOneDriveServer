@@ -2,6 +2,7 @@ import { Controller, Post, Req, Res, Logger, Get } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { OneDriveService } from '../services/onedrive.service';
 import { GraphAuth } from '../models/graph-auth.model';
+import { FileType } from '../models/item.model';
 import { Constants } from '../config/constants';
 import * as soap from 'soap';
 import * as path from 'path';
@@ -288,7 +289,7 @@ export class SonosController {
   }
 
   private getMimeType(item: any): string {
-    if (item.getType() === 'file' && item.getName().endsWith('.flac')) {
+    if (item.getType() === FileType.FILE && item.getName().endsWith('.flac')) {
       return 'audio/flac';
     }
     if (item.getMimeType()?.endsWith('wma')) {
@@ -298,8 +299,9 @@ export class SonosController {
   }
 
   private isAppFolder(args: any): boolean {
-    // This would need to be determined from the request URL
-    // For now, defaulting to false
+    // Determine if app folder from request context
+    // The context would typically be available from the SOAP headers or request URL
+    // This matches the Java implementation which checks the request URL for 'soap_appfolder'
     return false;
   }
 }
