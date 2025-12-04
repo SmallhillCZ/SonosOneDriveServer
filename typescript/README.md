@@ -89,7 +89,21 @@ typescript/
 
 ## Docker
 
-To build and run with Docker:
+### Using Docker Compose (Recommended)
+
+1. Create a `.env` file with your configuration:
+```env
+GRAPH_CLIENT_ID=your_microsoft_app_client_id
+```
+
+2. Run with Docker Compose:
+```bash
+docker-compose up -d
+```
+
+### Using Docker directly
+
+Build and run with Docker:
 
 ```bash
 # Build the image
@@ -97,6 +111,40 @@ docker build -t sonos-onedrive-server .
 
 # Run the container
 docker run -p 3000:3000 -e GRAPH_CLIENT_ID=your_client_id sonos-onedrive-server
+```
+
+## Deployment
+
+### Heroku
+
+1. Create a new Heroku app:
+```bash
+heroku create your-app-name
+```
+
+2. Set environment variables:
+```bash
+heroku config:set GRAPH_CLIENT_ID=your_client_id
+```
+
+3. Deploy:
+```bash
+git subtree push --prefix typescript heroku main
+```
+
+### Google Cloud Run
+
+1. Build the container:
+```bash
+gcloud builds submit --tag gcr.io/PROJECT_ID/sonos-onedrive
+```
+
+2. Deploy to Cloud Run:
+```bash
+gcloud run deploy sonos-onedrive \
+  --image gcr.io/PROJECT_ID/sonos-onedrive \
+  --platform managed \
+  --set-env-vars GRAPH_CLIENT_ID=your_client_id
 ```
 
 ## Architecture

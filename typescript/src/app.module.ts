@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SonosController } from './controllers/sonos.controller';
+import { StaticController } from './controllers/static.controller';
+import { HealthController } from './controllers/health.controller';
 import { OneDriveService } from './services/onedrive.service';
 
 @Module({
@@ -9,7 +11,7 @@ import { OneDriveService } from './services/onedrive.service';
       isGlobal: true,
     }),
   ],
-  controllers: [SonosController],
+  controllers: [SonosController, StaticController, HealthController],
   providers: [OneDriveService],
 })
 export class AppModule {}
