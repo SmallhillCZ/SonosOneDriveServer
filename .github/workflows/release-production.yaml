@@ -1,0 +1,59 @@
+name: Release to PRODUCTION
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  # TODO:
+  # test:
+  #   name: Test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Tests not implemented yet
+  #       run: echo "No tests implemented yet"
+
+  build:
+    name: Build
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      context: .
+      image-name: sonos-onedrive
+      retention-days: 1
+
+  publish:
+    name: Publish
+    needs:
+      - build
+      - version
+    uses: ./.github/workflows/publish.yml
+    with:
+      source-image-name: sonos-onedrive
+      publish-image-name: smallhillcz/sonos-onedrive
+      registry: ghcr.io
+      tag: latest
+    secrets:
+      username: ${{ github.actor }}
+      password: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    name: Deploy
+    needs: publish
+    uses: ./.github/workflows/deploy.yml
+    with:
+      images: ${{ needs.publish.outputs.images }}
+    secrets: inherit
+
+  tag:
+    name: Tag release
+    needs:
+      - deploy
+    uses: ./.github/workflows/tag.yml
+    with:
+      tag: production
