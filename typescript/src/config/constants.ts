@@ -9,6 +9,8 @@ export const ID_PREFIX = {
   AUDIO: 'audio',
 } as const;
 
+export const APP_LINK_STRING_ID = 'SIGN_IN';
+
 export const ROOT_ID = 'root';
 export const SEARCH_ID = 'search';
 export const SEARCH_FILES_ID = 'files';

@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import * as soap from 'soap';
 import {
+  APP_LINK_STRING_ID,
   FAULT,
   ID_PREFIX,
   ROOT_ID,
@@ -59,6 +60,15 @@ export class SonosSoapService {
     const handlers: Record<string, Handler> = {
       getDeviceLinkCode: async (args) => ({
         getDeviceLinkCodeResult: await this.oneDrive.getDeviceLinkCode(args.householdId, isAppFolder),
+      }),
+
+      getAppLink: async (args) => ({
+        getAppLinkResult: {
+          authorizeAccount: {
+            appUrlStringId: APP_LINK_STRING_ID,
+            deviceLink: await this.oneDrive.getDeviceLinkCode(args.householdId, isAppFolder),
+          },
+        },
       }),
 
       getDeviceAuthToken: async (args) => ({
@@ -132,7 +142,6 @@ export class SonosSoapService {
       reportAccountAction: async () => ({}),
 
       getSessionId: unsupported('getSessionId'),
-      getAppLink: unsupported('getAppLink'),
       getUserInfo: unsupported('getUserInfo'),
       getContentKey: unsupported('getContentKey'),
       rateItem: unsupported('rateItem'),

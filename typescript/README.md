@@ -42,7 +42,7 @@ docker compose up --build
 
 ## SMAPI support
 
-- Authentication: DeviceLink (`getDeviceLinkCode`, `getDeviceAuthToken`), `refreshAuthToken`, and `Client.TokenRefreshRequired` faults carrying a fresh token when Graph returns 401
+- Authentication: Microsoft device code flow exposed both as Sonos browser authentication (`getAppLink`, select "OAuth" in the Sonos developer portal) and legacy DeviceLink (`getDeviceLinkCode`); `getDeviceAuthToken` returns a SHA-256 hashed user id, `refreshAuthToken`, and `Client.TokenRefreshRequired` faults carrying a fresh token when Graph returns 401
 - Browse: `getMetadata` (`root`, `folder:<id>`, `search`), `getExtendedMetadata`, `getLastUpdate`
 - Search: `search` with category `files`
 - Playback: `getMediaMetadata`, `getMediaURI` (pre-authenticated OneDrive download URL)

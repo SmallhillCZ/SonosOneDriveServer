@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import { createHash } from 'crypto';
 import {
   AUTH_API_URI_DEFAULT,
   DRIVE_APPFOLDER,
@@ -74,7 +75,9 @@ export class OneDriveService {
         }),
       );
       this.logger.log(`${hashCode(householdId)}: Got token`);
-      return this.toTokenPair(data);
+      const tokens = this.toTokenPair(data);
+      const userIdHashCode = await this.getUserIdHashCode(data.access_token);
+      return userIdHashCode ? { ...tokens, userInfo: { userIdHashCode } } : tokens;
     } catch (error) {
       if (error instanceof SonosFault) {
         throw error;
@@ -192,6 +195,19 @@ export class OneDriveService {
         throw new SonosFault(FAULT.AUTH_TOKEN_EXPIRED);
       }
       throw new SonosFault(code === 503 || code === 429 ? FAULT.SERVICE_UNAVAILABLE : FAULT.SERVICE_UNKNOWN_ERROR);
+    }
+  }
+
+  private async getUserIdHashCode(accessToken: string): Promise<string | undefined> {
+    try {
+      const { data } = await this.graphApi.get('/me', {
+        params: { $select: 'id' },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      return data?.id ? createHash('sha256').update(String(data.id)).digest('hex') : undefined;
+    } catch (error) {
+      this.logger.warn(`Could not read user id: ${JSON.stringify(describe(error))}`);
+      return undefined;
     }
   }
 

@@ -208,6 +208,32 @@ describe('Sonos SOAP service', () => {
     expect(fake.requests[0].body).toMatchObject({ client_id: 'client-id', scope: 'user.read Files.ReadWrite.AppFolder offline_access' });
   });
 
+  it('returns an app link backed by the device code flow', async () => {
+    const res = await soap(
+      'getAppLink',
+      '<ns:householdId>HH1</ns:householdId><ns:hardware>iPhone</ns:hardware><ns:osVersion>17</ns:osVersion><ns:sonosAppName>Sonos</ns:sonosAppName><ns:callbackPath>sonos://x</ns:callbackPath>',
+      '/soap',
+      false,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(
+      '<getAppLinkResult><authorizeAccount><appUrlStringId>SIGN_IN</appUrlStringId><deviceLink><regUrl>https://microsoft.com/devicelogin</regUrl><linkCode>ABC123</linkCode><showLinkCode>true</showLinkCode><linkDeviceId>dev-code</linkDeviceId></deviceLink></authorizeAccount></getAppLinkResult>',
+    );
+    expect(fake.requests[0].body).toMatchObject({ scope: 'user.read files.read offline_access' });
+  });
+
+  it('returns a hashed user id with device auth tokens', async () => {
+    fake.graph.set('/me', { status: 200, body: { id: 'user-1' } });
+
+    const res = await soap('getDeviceAuthToken', '<ns:householdId>HH1</ns:householdId><ns:linkCode>ABC123</ns:linkCode><ns:linkDeviceId>dev-code</ns:linkDeviceId>', '/soap', false);
+
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/<privateKey>new-refresh<\/privateKey><userInfo><userIdHashCode>[0-9a-f]{64}<\/userIdHashCode><\/userInfo>/);
+    expect(res.text).not.toContain('user-1');
+    expect(fake.requests.find((r) => r.path === '/graph/me').headers.authorization).toBe('Bearer new-access');
+  });
+
   it('returns NOT_LINKED_RETRY while authorization is pending', async () => {
     fake.token = { status: 400, body: { error: 'authorization_pending' } };
 

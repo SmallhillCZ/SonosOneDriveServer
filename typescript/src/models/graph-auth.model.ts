@@ -9,4 +9,5 @@ export class GraphAuth {
 export interface TokenPair {
   authToken: string;
   privateKey: string;
+  userInfo?: { userIdHashCode: string };
 }
