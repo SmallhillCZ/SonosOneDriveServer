@@ -1,179 +1,64 @@
-# Sonos OneDrive Server - TypeScript/NestJS
+# Sonos OneDrive Server (TypeScript/NestJS)
 
-This is a TypeScript/NestJS rewrite of the Sonos OneDrive Service that allows you to play music stored on OneDrive through your Sonos system.
+Sonos Music API (SMAPI) service that lets Sonos browse, search and play audio stored on OneDrive.
 
-## Features
+## Requirements
 
-- Built with **NestJS** framework for better architecture and maintainability
-- Written in **TypeScript** for type safety
-- Uses **Axios** for HTTP requests
-- Integrates with **Microsoft Graph API** using official SDK
-- SOAP service implementation for Sonos integration
-
-## Prerequisites
-
-- Node.js 18+ and npm
-- [Microsoft app registration](https://docs.microsoft.com/en-us/onedrive/developer/rest-api/getting-started/app-registration?view=odsp-graph-online)
-
-## Installation
-
-```bash
-# Install dependencies
-npm install
-```
+- Node.js 20+
+- A [Microsoft app registration](https://learn.microsoft.com/en-us/onedrive/developer/rest-api/getting-started/app-registration) that allows personal Microsoft accounts and public client flows (device code)
 
 ## Configuration
 
-1. Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-
-2. Configure your environment variables:
-```env
-GRAPH_CLIENT_ID=your_microsoft_app_client_id
-PORT=3000
-```
-
-## Development
-
-```bash
-# Run in development mode with hot reload
-npm run start:dev
-
-# Run in debug mode
-npm run start:debug
-```
-
-## Production
-
-```bash
-# Build the application
-npm run build
-
-# Run the built application
-npm run start:prod
-```
-
-## Project Structure
-
-```
-typescript/
-├── src/
-│   ├── config/          # Configuration and constants
-│   ├── controllers/     # NestJS controllers (SOAP endpoints)
-│   ├── services/        # Business logic services
-│   ├── models/          # Data models and DTOs
-│   ├── app.module.ts    # Main application module
-│   └── main.ts          # Application entry point
-├── resources/
-│   └── wsdl/           # WSDL files for SOAP services
-├── package.json
-├── tsconfig.json
-└── nest-cli.json
-```
-
-## API Endpoints
-
-- `POST /soap` - SOAP endpoint for Sonos integration
-- `GET /wsdl` - WSDL file for service description
-
-## Environment Variables
-
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `GRAPH_CLIENT_ID` | Microsoft Graph API client ID | Required |
-| `PORT` | Server port | 3000 |
-| `GRAPH_API_URI` | Microsoft Graph API base URL | https://graph.microsoft.com/v1.0/ |
-| `AUTH_API_URI` | Microsoft Auth API base URL | https://login.microsoftonline.com/common/oauth2/v2.0/ |
+| `GRAPH_CLIENT_ID` | Microsoft app (client) ID | required |
+| `PORT` | HTTP port | `3000` |
+| `GRAPH_API_URI` | Microsoft Graph base URL | `https://graph.microsoft.com/v1.0/` |
+| `AUTH_API_URI` | Microsoft identity base URL | `https://login.microsoftonline.com/common/oauth2/v2.0/` |
 
-## Docker
+Copy `.env.example` to `.env` for local development.
 
-### Using Docker Compose (Recommended)
-
-1. Create a `.env` file with your configuration:
-```env
-GRAPH_CLIENT_ID=your_microsoft_app_client_id
-```
-
-2. Run with Docker Compose:
-```bash
-docker-compose up -d
-```
-
-### Using Docker directly
-
-Build and run with Docker:
+## Commands
 
 ```bash
-# Build the image
-docker build -t sonos-onedrive-server .
-
-# Run the container
-docker run -p 3000:3000 -e GRAPH_CLIENT_ID=your_client_id sonos-onedrive-server
+npm ci
+npm run start:dev
+npm test
+npm run build && npm run start:prod
+docker compose up --build
 ```
 
-## Deployment
+## Endpoints
 
-### Heroku
+| Path | Purpose |
+|------|---------|
+| `POST /soap` | SMAPI endpoint, whole OneDrive (`files.read` scope) |
+| `POST /soap_appfolder` | SMAPI endpoint limited to the app folder (`Files.ReadWrite.AppFolder` scope) |
+| `GET /wsdl`, `GET /soap?wsdl` | Sonos WSDL |
+| `GET /static/presentationMap.xml` | Presentation map (search categories, display types) |
+| `GET /static/strings.xml` | Localized strings |
+| `GET /.well-known/microsoft-identity-association.json` | Microsoft publisher domain verification |
+| `GET /health` | Health check |
 
-1. Create a new Heroku app:
-```bash
-heroku create your-app-name
+## SMAPI support
+
+- Authentication: DeviceLink (`getDeviceLinkCode`, `getDeviceAuthToken`), `refreshAuthToken`, and `Client.TokenRefreshRequired` faults carrying a fresh token when Graph returns 401
+- Browse: `getMetadata` (`root`, `folder:<id>`, `search`), `getExtendedMetadata`, `getLastUpdate`
+- Search: `search` with category `files`
+- Playback: `getMediaMetadata`, `getMediaURI` (pre-authenticated OneDrive download URL)
+- Reporting calls are acknowledged; write operations (containers, ratings, favorites) return `Server.ServiceUnknownError`
+
+Access tokens longer than 2048 characters are stored in Sonos in a compressed form and expanded on each request, compatible with the Java implementation.
+
+## Project structure
+
 ```
-
-2. Set environment variables:
-```bash
-heroku config:set GRAPH_CLIENT_ID=your_client_id
+src/
+├── app.factory.ts           app bootstrap shared by main.ts and tests
+├── config/constants.ts      SMAPI ids, fault codes, Graph paths
+├── controllers/             health, WSDL, Microsoft identity association
+├── models/                  Graph item and auth models
+├── services/onedrive.service.ts   Microsoft identity + Graph client
+└── soap/                    node-soap wiring, SMAPI handlers, media mapping, faults
+test/                        e2e tests against a fake Microsoft identity/Graph server
 ```
-
-3. Deploy:
-```bash
-git subtree push --prefix typescript heroku main
-```
-
-### Google Cloud Run
-
-1. Build the container:
-```bash
-gcloud builds submit --tag gcr.io/PROJECT_ID/sonos-onedrive
-```
-
-2. Deploy to Cloud Run:
-```bash
-gcloud run deploy sonos-onedrive \
-  --image gcr.io/PROJECT_ID/sonos-onedrive \
-  --platform managed \
-  --set-env-vars GRAPH_CLIENT_ID=your_client_id
-```
-
-## Architecture
-
-The application follows NestJS best practices:
-
-- **Controllers**: Handle HTTP/SOAP requests
-- **Services**: Contain business logic and external API integrations
-- **Models**: Define data structures
-- **Config**: Centralized configuration management
-
-### Key Components
-
-1. **OneDriveService**: Handles all Microsoft Graph API interactions including:
-   - Device authentication flow
-   - Token management and refresh
-   - File and folder operations
-   - Search functionality
-
-2. **SonosController**: Implements SOAP endpoints for Sonos integration:
-   - Media metadata retrieval
-   - Media URI generation
-   - Search functionality
-   - Authentication flow
-
-## License
-
-ISC
-
-## Original Java Version
-
-This is a TypeScript rewrite of the original Java/Spring implementation. The original version can be found in the parent directory.

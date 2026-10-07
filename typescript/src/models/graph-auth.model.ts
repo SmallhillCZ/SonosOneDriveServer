@@ -1,11 +1,12 @@
 export class GraphAuth {
-  householdId: string;
-  deviceCode: string;
-  refreshToken: string;
+  constructor(
+    readonly householdId: string,
+    readonly accessToken: string,
+    readonly refreshToken: string,
+  ) {}
+}
 
-  constructor(householdId?: string, deviceCode?: string, refreshToken?: string) {
-    this.householdId = householdId || null;
-    this.deviceCode = deviceCode || null;
-    this.refreshToken = refreshToken || null;
-  }
+export interface TokenPair {
+  authToken: string;
+  privateKey: string;
 }

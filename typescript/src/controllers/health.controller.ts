@@ -1,27 +1,22 @@
 import { Controller, Get } from '@nestjs/common';
+import { SOAP_APPFOLDER_PATH, SOAP_PATH } from '../config/constants';
 
 @Controller()
 export class HealthController {
   @Get('/health')
-  healthCheck() {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      service: 'Sonos OneDrive Server',
-      version: '1.0.0',
-    };
+  health() {
+    return { status: 'ok' };
   }
 
   @Get('/')
   root() {
     return {
       name: 'Sonos OneDrive Server',
-      version: '1.0.0',
-      description: 'TypeScript/NestJS implementation of Sonos OneDrive integration',
       endpoints: {
-        health: '/health',
-        soap: '/soap',
+        soap: SOAP_PATH,
+        soapAppFolder: SOAP_APPFOLDER_PATH,
         wsdl: '/wsdl',
+        health: '/health',
       },
     };
   }

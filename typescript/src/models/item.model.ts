@@ -1,104 +1,67 @@
 export enum FileType {
   FILE = 'file',
   AUDIO = 'audio',
-  FOLDER = 'folder'
+  FOLDER = 'folder',
 }
 
 export class Item {
-  type: FileType;
-  id: string;
-  name: string;
-  mimeType: string;
-  duration: number;
-  album: string;
-  artist: string;
-  title: string;
-  parentId: string;
-  fileUri: string;
-  thumbnail: string;
-  track: number;
-  childCount: number;
+  readonly type?: FileType;
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType?: string;
+  readonly duration?: number;
+  readonly album?: string;
+  readonly artist?: string;
+  readonly title?: string;
+  readonly fileUri?: string;
+  readonly thumbnail?: string;
+  readonly track?: number;
+  readonly childCount?: number;
 
   constructor(data: any) {
-    this.id = data.id || null;
-    this.name = data.name || null;
-
-    if (data.parentReference) {
-      this.parentId = data.parentReference.id || null;
-    }
+    this.id = data.id;
+    this.name = data.name ?? '';
 
     if (data.file) {
       if (data.audio) {
         this.type = FileType.AUDIO;
-        this.album = data.audio.album || null;
-        this.artist = data.audio.artist || null;
-        this.title = data.audio.title || null;
+        this.album = data.audio.album;
+        this.artist = data.audio.artist;
+        this.title = data.audio.title;
         this.duration = data.audio.duration ? Math.floor(data.audio.duration / 1000) : 0;
         this.track = data.audio.track || 1;
       } else {
         this.type = FileType.FILE;
       }
-      this.mimeType = data.file.mimeType || null;
-      this.fileUri = data['@microsoft.graph.downloadUrl'] || null;
+      this.mimeType = data.file.mimeType;
+      this.fileUri = data['@microsoft.graph.downloadUrl'];
     } else if (data.folder) {
       this.type = FileType.FOLDER;
-      this.childCount = data.folder.childCount || 0;
+      this.childCount = data.folder.childCount ?? 0;
     }
 
-    if (data.thumbnails && data.thumbnails.length > 0) {
-      this.thumbnail = data.thumbnails[0].small?.url || null;
+    const thumbnail = data.thumbnails?.[0];
+    this.thumbnail = thumbnail?.large?.url ?? thumbnail?.medium?.url ?? thumbnail?.small?.url;
+  }
+
+  get isPlayable(): boolean {
+    return (
+      this.type === FileType.AUDIO ||
+      (this.type === FileType.FILE && (this.name.toLowerCase().endsWith('.flac') || !!this.mimeType?.includes('audio')))
+    );
+  }
+
+  get sonosMimeType(): string {
+    if (this.type === FileType.FILE && this.name.toLowerCase().endsWith('.flac')) {
+      return 'audio/flac';
     }
+    if (this.mimeType?.endsWith('wma')) {
+      return 'audio/wma';
+    }
+    return this.mimeType ?? 'application/octet-stream';
   }
 
-  getType(): FileType {
-    return this.type;
-  }
-
-  getId(): string {
-    return this.id;
-  }
-
-  getName(): string {
-    return this.name;
-  }
-
-  getMimeType(): string {
-    return this.mimeType;
-  }
-
-  getDuration(): number {
-    return this.duration;
-  }
-
-  getAlbum(): string {
-    return this.album;
-  }
-
-  getArtist(): string {
-    return this.artist;
-  }
-
-  getTitle(): string {
-    return this.title;
-  }
-
-  getParentId(): string {
-    return this.parentId;
-  }
-
-  getFileUri(): string {
-    return this.fileUri;
-  }
-
-  getThumbnail(): string {
-    return this.thumbnail;
-  }
-
-  getTrack(): number {
-    return this.track;
-  }
-
-  getChildCount(): number {
-    return this.childCount;
+  get displayTitle(): string {
+    return this.title || this.name;
   }
 }

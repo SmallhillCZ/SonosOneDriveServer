@@ -1,29 +1,37 @@
-export class Constants {
-  // Item types
-  static readonly PROGRAM = 'program';
-  static readonly DEFAULT = 'default';
-  static readonly FOLDER = 'folder';
-  static readonly FILE = 'file';
-  static readonly AUDIO = 'audio';
-  static readonly FILES = 'files';
+export const SONOS_NAMESPACE = 'http://www.sonos.com/Services/1.1';
 
-  // Error codes
-  static readonly SESSION_INVALID = 'Client.SessionIdInvalid';
-  static readonly LOGIN_INVALID = 'Client.LoginInvalid';
-  static readonly SERVICE_UNKNOWN_ERROR = 'Client.ServiceUnknownError';
-  static readonly SERVICE_UNAVAILABLE = 'Client.ServiceUnavailable';
-  static readonly ITEM_NOT_FOUND = 'Client.ItemNotFound';
-  static readonly TOKEN_REFRESH_REQUIRED = 'Client.TokenRefreshRequired';
-  static readonly AUTH_TOKEN_EXPIRED = 'Client.AuthTokenExpired';
-  static readonly NOT_LINKED_RETRY = 'Client.NOT_LINKED_RETRY';
-  static readonly NOT_LINKED_FAILURE = 'Client.NOT_LINKED_FAILURE';
+export const SOAP_PATH = '/soap';
+export const SOAP_APPFOLDER_PATH = '/soap_appfolder';
 
-  // API URIs
-  static readonly AUTH_API_URI_DEFAULT = 'https://login.microsoftonline.com/common/oauth2/v2.0/';
-  static readonly GRAPH_API_URI_DEFAULT = 'https://graph.microsoft.com/v1.0/';
-  static readonly DRIVE_ROOT = '/me/drive/root';
-  static readonly DRIVE_APPFOLDER = '/drive/special/approot';
+export const ID_PREFIX = {
+  FOLDER: 'folder',
+  FILE: 'file',
+  AUDIO: 'audio',
+} as const;
 
-  // Other constants
-  static readonly CAN_PLAY_COUNT = 100;
-}
+export const ROOT_ID = 'root';
+export const SEARCH_ID = 'search';
+export const SEARCH_FILES_ID = 'files';
+
+export const FAULT = {
+  SESSION_INVALID: 'Client.SessionIdInvalid',
+  LOGIN_INVALID: 'Client.LoginInvalid',
+  ITEM_NOT_FOUND: 'Client.ItemNotFound',
+  TOKEN_REFRESH_REQUIRED: 'Client.TokenRefreshRequired',
+  AUTH_TOKEN_EXPIRED: 'Client.AuthTokenExpired',
+  NOT_LINKED_RETRY: 'Client.NOT_LINKED_RETRY',
+  NOT_LINKED_FAILURE: 'Client.NOT_LINKED_FAILURE',
+  SERVICE_UNKNOWN_ERROR: 'Server.ServiceUnknownError',
+  SERVICE_UNAVAILABLE: 'Server.ServiceUnavailable',
+} as const;
+
+export const AUTH_API_URI_DEFAULT = 'https://login.microsoftonline.com/common/oauth2/v2.0/';
+export const GRAPH_API_URI_DEFAULT = 'https://graph.microsoft.com/v1.0/';
+export const DRIVE_ROOT = '/me/drive/root';
+export const DRIVE_APPFOLDER = '/me/drive/special/approot';
+
+export const SCOPE_FILES = 'user.read files.read offline_access';
+export const SCOPE_APPFOLDER = 'user.read Files.ReadWrite.AppFolder offline_access';
+
+export const CAN_PLAY_COUNT = 100;
+export const MAX_TOKEN_LENGTH = 2048;

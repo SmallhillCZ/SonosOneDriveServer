@@ -1,372 +1,258 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance } from 'axios';
-import { GraphAuth } from '../models/graph-auth.model';
-import { Item, FileType } from '../models/item.model';
-import { Constants } from '../config/constants';
-import { hashCode } from '../utils/string.utils';
+import axios, { AxiosError, AxiosInstance } from 'axios';
+import {
+  AUTH_API_URI_DEFAULT,
+  DRIVE_APPFOLDER,
+  DRIVE_ROOT,
+  FAULT,
+  GRAPH_API_URI_DEFAULT,
+  MAX_TOKEN_LENGTH,
+  SCOPE_APPFOLDER,
+  SCOPE_FILES,
+} from '../config/constants';
+import { GraphAuth, TokenPair } from '../models/graph-auth.model';
+import { Item } from '../models/item.model';
+import { MediaList, toMediaList } from '../soap/media.mapper';
+import { SonosFault } from '../soap/sonos-fault';
+
+export interface DeviceLinkCode {
+  regUrl: string;
+  linkCode: string;
+  showLinkCode: boolean;
+  linkDeviceId: string;
+}
 
 @Injectable()
 export class OneDriveService {
   private readonly logger = new Logger(OneDriveService.name);
-  private readonly graphApiUri: string;
-  private readonly authApiUri: string;
+  private readonly authApi: AxiosInstance;
+  private readonly graphApi: AxiosInstance;
   private readonly clientId: string;
-  private readonly axiosInstance: AxiosInstance;
 
-  constructor(private configService: ConfigService) {
-    this.graphApiUri = this.configService.get<string>('GRAPH_API_URI', Constants.GRAPH_API_URI_DEFAULT);
-    this.authApiUri = this.configService.get<string>('AUTH_API_URI', Constants.AUTH_API_URI_DEFAULT);
-    this.clientId = this.configService.get<string>('GRAPH_CLIENT_ID');
-    
-    this.axiosInstance = axios.create({
-      baseURL: this.graphApiUri,
+  constructor(configService: ConfigService) {
+    this.clientId = configService.get<string>('GRAPH_CLIENT_ID');
+    this.authApi = axios.create({
+      baseURL: configService.get<string>('AUTH_API_URI') || AUTH_API_URI_DEFAULT,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    this.graphApi = axios.create({
+      baseURL: configService.get<string>('GRAPH_API_URI') || GRAPH_API_URI_DEFAULT,
     });
   }
 
-  async getDeviceLinkCode(householdId: string, isAppFolder: boolean): Promise<any> {
-    this.logger.debug('getDeviceLinkCode');
-
-    const scope = isAppFolder
-      ? 'user.read Files.ReadWrite.AppFolder offline_access'
-      : 'user.read files.read offline_access';
-
+  async getDeviceLinkCode(householdId: string, isAppFolder: boolean): Promise<DeviceLinkCode> {
     try {
-      const response = await axios.post(
-        `${this.authApiUri}devicecode`,
-        new URLSearchParams({
-          client_id: this.clientId,
-          scope: scope,
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
+      const { data } = await this.authApi.post(
+        'devicecode',
+        new URLSearchParams({ client_id: this.clientId, scope: scope(isAppFolder) }),
       );
-
       this.logger.log(`${hashCode(householdId)}: Got verification uri`);
-
       return {
-        linkCode: response.data.user_code,
-        regUrl: response.data.verification_uri,
-        linkDeviceId: response.data.device_code,
+        regUrl: data.verification_uri,
+        linkCode: data.user_code,
         showLinkCode: true,
+        linkDeviceId: data.device_code,
       };
     } catch (error) {
-      this.logger.error('Error getting device link code', error.response?.data);
-      throw error;
+      this.logger.error(`${hashCode(householdId)}: getDeviceLinkCode failed`, describe(error));
+      if (status(error) === 401) {
+        throw new SonosFault(FAULT.LOGIN_INVALID);
+      }
+      throw new SonosFault(FAULT.SERVICE_UNKNOWN_ERROR);
     }
   }
 
-  async getDeviceAuthToken(householdId: string, linkDeviceId: string): Promise<any> {
-    this.logger.debug('getDeviceAuthToken');
-
+  async getDeviceAuthToken(householdId: string, linkDeviceId: string): Promise<TokenPair> {
     try {
-      const response = await axios.post(
-        `${this.authApiUri}token`,
+      const { data } = await this.authApi.post(
+        'token',
         new URLSearchParams({
           client_id: this.clientId,
           device_code: linkDeviceId,
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
         }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
       );
-
-      let accessToken = response.data.access_token;
-      const refreshToken = response.data.refresh_token;
-
-      if (accessToken.length > 2048) {
-        accessToken = this.compressToken(accessToken);
-      }
-
       this.logger.log(`${hashCode(householdId)}: Got token`);
-
-      return {
-        authToken: accessToken,
-        privateKey: refreshToken,
-      };
+      return this.toTokenPair(data);
     } catch (error) {
-      if (error.response?.status === 400) {
-        const errorData = error.response.data;
-        if (errorData.error === 'authorization_pending') {
-          this.logger.log(`${hashCode(householdId)}: Not linked retry`);
-          throw new Error(Constants.NOT_LINKED_RETRY);
-        }
+      if (error instanceof SonosFault) {
+        throw error;
       }
-      this.logger.error('Error getting device auth token', error.response?.data);
-      throw error;
+      const oauthError = (error as AxiosError<any>).response?.data?.error;
+      if (status(error) === 401 || oauthError === 'authorization_pending' || oauthError === 'slow_down') {
+        this.logger.log(`${hashCode(householdId)}: Not linked retry`);
+        throw SonosFault.withSonosError(FAULT.NOT_LINKED_RETRY, 'NOT_LINKED_RETRY', 5);
+      }
+      this.logger.error(`${hashCode(householdId)}: getDeviceAuthToken failed`, describe(error));
+      throw SonosFault.withSonosError(FAULT.NOT_LINKED_FAILURE, 'NOT_LINKED_FAILURE', 6);
     }
   }
 
-  async refreshAuthToken(auth: GraphAuth, isAppFolder: boolean): Promise<GraphAuth> {
-    this.logger.debug('refreshAuthToken');
-
-    const scope = isAppFolder
-      ? 'user.read Files.ReadWrite.AppFolder offline_access'
-      : 'user.read files.read offline_access';
-
+  async refreshAuthToken(auth: GraphAuth, isAppFolder: boolean): Promise<TokenPair> {
     try {
-      const response = await axios.post(
-        `${this.authApiUri}token`,
+      const { data } = await this.authApi.post(
+        'token',
         new URLSearchParams({
           client_id: this.clientId,
           refresh_token: auth.refreshToken,
           grant_type: 'refresh_token',
-          scope: scope,
+          scope: scope(isAppFolder),
         }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
       );
-
-      let accessToken = response.data.access_token;
-      const refreshToken = response.data.refresh_token;
-
-      if (accessToken.length > 2048) {
-        accessToken = this.compressToken(accessToken);
-      }
-
-      const newAuth = new GraphAuth();
-      newAuth.deviceCode = accessToken;
-      newAuth.refreshToken = refreshToken;
-
       this.logger.log(`${hashCode(auth.householdId)}: Got refreshed token`);
-
-      return newAuth;
+      return this.toTokenPair(data);
     } catch (error) {
-      this.logger.error('Error refreshing auth token', error.response?.data);
-      throw error;
+      if (error instanceof SonosFault) {
+        throw error;
+      }
+      this.logger.error(`${hashCode(auth.householdId)}: refreshAuthToken failed`, describe(error));
+      const oauthError = (error as AxiosError<any>).response?.data?.error;
+      if (status(error) === 401 || oauthError === 'invalid_grant') {
+        throw new SonosFault(FAULT.AUTH_TOKEN_EXPIRED);
+      }
+      throw new SonosFault(FAULT.SERVICE_UNKNOWN_ERROR);
     }
   }
 
-  async getLastUpdate(auth: GraphAuth): Promise<string> {
-    this.logger.debug('getLastUpdate');
-
-    const path = `${Constants.DRIVE_ROOT}/delta`;
-    const response = await this.graphApiGetRequest(path, 1, null, auth);
-
-    if (response.value && response.value.length > 0) {
-      return response.value[0].lastModifiedDateTime;
-    }
-
-    return null;
+  async getLastUpdate(auth: GraphAuth, isAppFolder: boolean): Promise<string> {
+    const data = await this.graphGet(`${driveRoot(isAppFolder)}/delta`, auth, isAppFolder, { top: 1 });
+    return data.value?.[0]?.lastModifiedDateTime ?? '';
   }
 
-  async getMetadata(id: string, count: number, index: number, auth: GraphAuth, isAppFolder: boolean): Promise<any> {
-    this.logger.debug(`getMetadata id:${id} count:${count} index:${index}`);
+  async getRootChildren(auth: GraphAuth, isAppFolder: boolean, index: number, count: number): Promise<MediaList> {
+    return this.getPage(`${driveRoot(isAppFolder)}/children`, auth, isAppFolder, index, count);
+  }
 
-    let path: string;
+  async getFolderChildren(
+    folderId: string,
+    auth: GraphAuth,
+    isAppFolder: boolean,
+    index: number,
+    count: number,
+  ): Promise<MediaList> {
+    return this.getPage(`/me/drive/items/${encodeURIComponent(folderId)}/children`, auth, isAppFolder, index, count);
+  }
 
-    if (id === 'root') {
-      path = isAppFolder ? `${Constants.DRIVE_APPFOLDER}/children` : `${Constants.DRIVE_ROOT}/children`;
-    } else if (id.startsWith(Constants.FOLDER)) {
-      const itemId = id.replace(`${Constants.FOLDER}:`, '');
-      path = `/me/drive/items/${itemId}/children`;
-    } else {
-      return null;
-    }
+  async search(term: string, auth: GraphAuth, isAppFolder: boolean, index: number, count: number): Promise<MediaList> {
+    const query = encodeURIComponent(term.replace(/'/g, "''"));
+    return this.getPage(`${driveRoot(isAppFolder)}/search(q='${query}')`, auth, isAppFolder, index, count);
+  }
 
-    let skipToken = null;
+  async getItem(itemId: string, auth: GraphAuth, isAppFolder: boolean): Promise<Item> {
+    const data = await this.graphGet(`/me/drive/items/${encodeURIComponent(itemId)}`, auth, isAppFolder, {
+      expand: 'thumbnails',
+    });
+    return new Item(data);
+  }
+
+  private async getPage(
+    path: string,
+    auth: GraphAuth,
+    isAppFolder: boolean,
+    index: number,
+    count: number,
+  ): Promise<MediaList> {
+    const params: Record<string, string | number> = { expand: 'thumbnails', top: count };
     if (index > 0) {
-      skipToken = await this.getSkipToken(path, index, auth);
+      const skipToken = await this.getSkipToken(path, auth, isAppFolder, index);
+      if (!skipToken) {
+        return { index, count: 0, total: index };
+      }
+      params.$skiptoken = skipToken;
     }
-
-    const response = await this.graphApiGetRequest(path, count, skipToken, auth);
-    return this.parseMediaListResponse(response);
+    return toMediaList(await this.graphGet(path, auth, isAppFolder, params), index);
   }
 
-  async searchFiles(term: string, count: number, index: number, auth: GraphAuth): Promise<any> {
-    this.logger.debug('searchFiles');
-
-    const path = `/me/drive/root/search(q='${term}')`;
-    
-    let skipToken = null;
-    if (index > 0) {
-      skipToken = await this.getSkipToken(path, index, auth);
-    }
-
-    const response = await this.graphApiGetRequest(path, count, skipToken, auth);
-    return this.parseMediaListResponse(response);
+  private async getSkipToken(path: string, auth: GraphAuth, isAppFolder: boolean, index: number): Promise<string> {
+    const data = await this.graphGet(path, auth, isAppFolder, { top: index, select: 'id' });
+    const match = (data['@odata.nextLink'] as string)?.match(/\$skiptoken=([^&]+)/i);
+    return match ? decodeURIComponent(match[1]) : undefined;
   }
 
-  async getItemById(id: string, auth: GraphAuth): Promise<Item> {
-    this.logger.debug(`getItemById id:${id}`);
-
-    const response = await this.graphApiGetRequest(`me/drive/items/${id}`, 1, null, auth);
-    return new Item(response);
-  }
-
-  private async graphApiGetRequest(path: string, count: number, skipToken: string, auth: GraphAuth): Promise<any> {
+  private async graphGet(path: string, auth: GraphAuth, isAppFolder: boolean, params: object): Promise<any> {
     try {
-      const params: any = {};
-
-      if (!path.includes('delta')) {
-        params.expand = 'thumbnails';
-      }
-      if (count > 1) {
-        params.top = count;
-      }
-      if (skipToken) {
-        params.$skipToken = skipToken;
-      }
-      if (count > 100 && count !== Number.MAX_SAFE_INTEGER) {
-        params.select = 'id';
-      }
-
-      const response = await this.axiosInstance.get(path, {
+      const { data } = await this.graphApi.get(path, {
         params,
-        headers: {
-          Authorization: `Bearer ${auth.deviceCode}`,
-        },
+        headers: { Authorization: `Bearer ${auth.accessToken}` },
       });
-
-      return response.data;
+      return data;
     } catch (error) {
-      if (error.response?.status === 401) {
-        this.logger.debug('Request NotAuthorized, trying to refresh token');
-        throw new Error(Constants.TOKEN_REFRESH_REQUIRED);
+      const code = status(error);
+      if (code === 401) {
+        this.logger.debug(`${hashCode(auth.householdId)}: Graph returned 401, refreshing token`);
+        const tokens = await this.refreshAuthToken(auth, isAppFolder);
+        throw SonosFault.withRefreshedToken(FAULT.TOKEN_REFRESH_REQUIRED, tokens.authToken, tokens.privateKey);
       }
-      this.logger.error('Bad request', error.response?.data);
-      throw error;
-    }
-  }
-
-  private async getSkipToken(path: string, index: number, auth: GraphAuth): Promise<string> {
-    const response = await this.graphApiGetRequest(path, index, null, auth);
-    
-    if (response['@odata.nextLink']) {
-      const match = response['@odata.nextLink'].match(/\$skiptoken=(.+)/i);
-      if (match) {
-        return match[1];
+      if (code === 404) {
+        throw new SonosFault(FAULT.ITEM_NOT_FOUND);
       }
-    }
-    
-    return null;
-  }
-
-  private parseMediaListResponse(data: any): any {
-    const items: any[] = [];
-
-    if (data.value) {
-      for (const itemData of data.value) {
-        const item = new Item(itemData);
-        
-        if (!item.getType()) {
-          this.logger.debug(`Ignoring item with null type: ${item.getName()}`);
-          continue;
-        }
-
-        if (
-          item.getType() === FileType.AUDIO ||
-          (item.getType() === FileType.FILE && item.getName().endsWith('.flac')) ||
-          (item.getType() === FileType.FILE && item.getMimeType()?.includes('audio'))
-        ) {
-          items.push(this.buildMediaMetadata(item));
-        } else if (item.getType() === FileType.FOLDER || item.getType() === FileType.FILE) {
-          items.push(this.buildMediaCollection(item));
-        }
+      this.logger.error(`${hashCode(auth.householdId)}: Graph request ${path} failed`, describe(error));
+      if ((error as AxiosError<any>).response?.data?.error === 'invalid_grant') {
+        throw new SonosFault(FAULT.AUTH_TOKEN_EXPIRED);
       }
+      throw new SonosFault(code === 503 || code === 429 ? FAULT.SERVICE_UNAVAILABLE : FAULT.SERVICE_UNKNOWN_ERROR);
     }
-
-    return {
-      items,
-      count: items.length,
-      total: data['@odata.count'] || items.length,
-    };
   }
 
-  private buildMediaCollection(item: Item): any {
-    const mc: any = {};
-
-    if (
-      item.getType() === FileType.AUDIO ||
-      (item.getType() === FileType.FILE && item.getName().endsWith('.flac')) ||
-      (item.getType() === FileType.FILE && item.getMimeType()?.includes('audio'))
-    ) {
-      mc.id = `${Constants.AUDIO}:${item.getId()}`;
-      mc.itemType = 'track';
-      mc.title = item.getTitle() || item.getName();
-      mc.artist = item.getArtist();
-      mc.albumArtURI = item.getThumbnail();
-      mc.canPlay = true;
-      mc.canEnumerate = false;
-    } else if (item.getType() === FileType.FILE) {
-      mc.id = `${Constants.FILE}:${item.getId()}`;
-      mc.itemType = 'other';
-      mc.title = item.getName();
-      mc.canPlay = false;
-      mc.canEnumerate = false;
-    } else if (item.getType() === FileType.FOLDER) {
-      mc.id = `${Constants.FOLDER}:${item.getId()}`;
-      mc.itemType = 'collection';
-      mc.title = item.getName();
-      mc.canPlay = item.getChildCount() < Constants.CAN_PLAY_COUNT;
-      mc.canEnumerate = true;
+  private toTokenPair(data: any): TokenPair {
+    if (!data?.access_token || !data?.refresh_token) {
+      throw SonosFault.withSonosError(FAULT.NOT_LINKED_FAILURE, 'NOT_LINKED_FAILURE', 6);
     }
-
-    return mc;
+    return { authToken: compressToken(data.access_token), privateKey: data.refresh_token };
   }
+}
 
-  private buildMediaMetadata(item: Item): any {
-    return {
-      id: item.getId(),
-      mimeType: this.getMimeType(item),
-      itemType: 'track',
-      displayType: 'audio',
-      title: item.getTitle() || item.getName(),
-      artist: item.getArtist(),
-      album: item.getAlbum(),
-      duration: item.getDuration(),
-      albumArtURI: item.getThumbnail(),
-      trackNumber: item.getTrack(),
-    };
+export function compressToken(token: string): string {
+  if (token.length <= MAX_TOKEN_LENGTH) {
+    return token;
   }
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new SonosFault(FAULT.NOT_LINKED_FAILURE);
+  }
+  return [base64UrlDecode(parts[0]), base64UrlDecode(parts[1]), parts[2]].join('###');
+}
 
-  private getMimeType(item: Item): string {
-    if (item.getType() === FileType.FILE && item.getName().endsWith('.flac')) {
-      return 'audio/flac';
-    }
-    if (item.getMimeType()?.endsWith('wma')) {
-      return 'audio/wma';
-    }
-    return item.getMimeType();
+export function decompressToken(token: string): string {
+  if (!token.startsWith('{') || !token.includes('###')) {
+    return token;
   }
+  const parts = token.split('###');
+  if (parts.length !== 3) {
+    throw new SonosFault(FAULT.NOT_LINKED_FAILURE);
+  }
+  return [base64UrlEncode(parts[0]), base64UrlEncode(parts[1]), parts[2]].join('.');
+}
 
-  private compressToken(token: string): string {
-    this.logger.log('Access token too long, compressing...');
-    
-    const tokenParts = token.split('.');
-    if (tokenParts.length === 3) {
-      const decodedFirstPart = Buffer.from(tokenParts[0], 'base64').toString('utf-8');
-      const decodedSecondPart = Buffer.from(tokenParts[1], 'base64').toString('utf-8');
-      const compressedToken = `${decodedFirstPart}###${decodedSecondPart}###${tokenParts[2]}`;
-      
-      if (compressedToken.length > 2048) {
-        this.logger.error('Compressed token too long');
-      }
-      
-      return compressedToken;
-    }
-    
-    throw new Error(Constants.NOT_LINKED_FAILURE);
+export function hashCode(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < (value ?? '').length; i++) {
+    hash = (Math.imul(31, hash) + value.charCodeAt(i)) | 0;
   }
+  return hash;
+}
 
-  decompressToken(compressedToken: string): string {
-    if (compressedToken.startsWith('{') && compressedToken.includes('###')) {
-      const tokenParts = compressedToken.split('###');
-      if (tokenParts.length === 3) {
-        const encodedFirstPart = Buffer.from(tokenParts[0]).toString('base64').replace(/=/g, '');
-        const encodedSecondPart = Buffer.from(tokenParts[1]).toString('base64').replace(/=/g, '');
-        return `${encodedFirstPart}.${encodedSecondPart}.${tokenParts[2]}`;
-      }
-    }
-    return compressedToken;
-  }
+function base64UrlDecode(value: string): string {
+  return Buffer.from(value, 'base64url').toString('utf-8');
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value, 'utf-8').toString('base64url');
+}
+
+function scope(isAppFolder: boolean): string {
+  return isAppFolder ? SCOPE_APPFOLDER : SCOPE_FILES;
+}
+
+function driveRoot(isAppFolder: boolean): string {
+  return isAppFolder ? DRIVE_APPFOLDER : DRIVE_ROOT;
+}
+
+function status(error: unknown): number | undefined {
+  return (error as AxiosError)?.response?.status;
+}
+
+function describe(error: unknown): unknown {
+  return (error as AxiosError)?.response?.data ?? (error as Error)?.message;
 }

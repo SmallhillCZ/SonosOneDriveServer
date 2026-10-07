@@ -1,15 +1,11 @@
-version: '3.8'
-
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     ports:
       - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - NODE_ENV=production
       - GRAPH_CLIENT_ID=${GRAPH_CLIENT_ID}
-      - GRAPH_API_URI=${GRAPH_API_URI:-https://graph.microsoft.com/v1.0/}
-      - AUTH_API_URI=${AUTH_API_URI:-https://login.microsoftonline.com/common/oauth2/v2.0/}
     restart: unless-stopped
