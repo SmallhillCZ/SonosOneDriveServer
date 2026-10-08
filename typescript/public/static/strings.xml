@@ -2,7 +2,7 @@
 <stringtables xmlns="http://sonos.com/sonosapi">
     <stringtable rev="1" xml:lang="en-US">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -12,7 +12,7 @@
     </stringtable>
     <stringtable rev="1" xml:lang="de-DE">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -22,7 +22,7 @@
     </stringtable>
     <stringtable rev="1" xml:lang="fr-FR">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -32,7 +32,7 @@
     </stringtable>
     <stringtable rev="1" xml:lang="it-IT">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -51,7 +51,7 @@
     </stringtable>
     <stringtable rev="0" xml:lang="sv-SE">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -61,7 +61,7 @@
     </stringtable>
     <stringtable rev="0" xml:lang="nl-NL">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -71,7 +71,7 @@
     </stringtable>
     <stringtable rev="0" xml:lang="ja-JP">
                 <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-                <string stringId="SIGN_IN">Auhtorize</string>
+                <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -81,7 +81,7 @@
     </stringtable>
     <stringtable rev="0" xml:lang="zh-CN">
                 <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-                <string stringId="SIGN_IN">Auhtorize</string>
+                <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -91,7 +91,7 @@
     </stringtable>
         <stringtable rev="0" xml:lang="da-DK">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -101,7 +101,7 @@
     </stringtable>
         <stringtable rev="0" xml:lang="pt-BR">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
@@ -111,7 +111,7 @@
     </stringtable>
         <stringtable rev="0" xml:lang="nb-NO">
         <string stringId="ServicePromo">Connect OneDrive to your Sonos. Comments or questions email martin.kopecek@smallhill.cz.</string>
-        <string stringId="SIGN_IN">Auhtorize</string>
+        <string stringId="SIGN_IN">Authorize</string>
 		<string stringId="RATE_UP">Interesting!</string>
 		<string stringId="SUCCESS_UP">Got it!</string>
 		<string stringId="RATE_DOWN">Not Interesting!</string>
